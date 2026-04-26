@@ -1,221 +1,34 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Roofing Quote Calculator</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 20px;
-            background-color: #121212;
-            color: #e0e0e0;
+function calculateQuote(wasteArea, stories, drainType, totalFeet) {
+    let baseMaterialCost = wasteArea * 100; // Assuming $100 per waste area
+    let heightHazard = (stories - 1) * 1000; // $1,000 per story over 1
+    let drainCost;
+
+    switch (drainType) {
+        case 'retrofit':
+            drainCost = 750; // $750 per drain retrofit
+            break;
+        case 'replacement':
+            drainCost = 1500; // $1,500 per drain replacement
+            break;
+        default:
+            drainCost = 0; // No cost for other types
+    }
+
+    let gutterCost = totalFeet * 10; // $10 per foot of gutter
+
+    let totalCost = baseMaterialCost + heightHazard + drainCost + gutterCost;
+
+    return {
+        totalCost: totalCost,
+        itemizedBreakdown: {
+            baseMaterialCost: baseMaterialCost,
+            heightHazard: heightHazard,
+            drainCost: drainCost,
+            gutterCost: gutterCost
         }
-        #headerDisplay {
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            background-color: #1e1e1e;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            border: 2px solid #bb86fc;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            line-height: 1.6;
-        }
-        .section {
-            display: none;
-            background-color: #1e1e1e;
-            padding: 25px;
-            margin: 20px 0;
-            border-radius: 8px;
-            border: 1px solid #333;
-        }
-        .section.active { display: block; }
-        label { display: block; margin-top: 15px; font-weight: bold; color: #bb86fc; }
-        input, select {
-            width: 100%; max-width: 400px; padding: 12px; margin-top: 8px;
-            background-color: #2c2c2c; border: 1px solid #444; border-radius: 4px;
-            color: white; box-sizing: border-box;
-        }
-        button {
-            margin-top: 20px; padding: 12px 24px; margin-right: 10px;
-            background-color: #03dac6; color: #000; font-weight: bold;
-            border: none; border-radius: 4px; cursor: pointer; transition: 0.3s;
-        }
-        button:hover { background-color: #018786; }
-        .back-btn { background-color: #555; color: white; }
-        .clear-btn { background-color: #cf6679; color: #000; }
-        .drain-group { border: 1px solid #444; padding: 15px; border-radius: 8px; margin-bottom: 15px; background-color: #252525; }
-        .summary-list { list-style: none; padding: 0; }
-        .summary-list li { padding: 8px 0; border-bottom: 1px solid #333; }
-        h1 { color: #bb86fc; margin-top: 0; }
-        h2 { color: #03dac6; }
-        strong { color: #ffffff; }
-        .total-box { font-size: 1.1em; color: #03dac6; border-bottom: 1px solid #444; margin-bottom: 10px; padding-bottom: 5px; }
-        .waste-text { color: #ffab40; font-weight: bold; }
-        .price-text { color: #03dac6; font-size: 1.3em; font-weight: bold; }
-    </style>
-</head>
-<body>
+    };
+}
 
-    <div id="headerDisplay">
-        <div id="clientDetails"><strong>Client:</strong> ---</div>
-        <div id="totalDetails" class="total-box"><strong>Net Area:</strong> 0 sq ft</div>
-        <div id="quoteDisplay" class="total-box" style="color:#bb86fc;"><strong>Project Estimate:</strong> $0.00</div>
-        <div id="runningList" style="font-size: 0.8em; opacity: 0.7; margin-top: 10px;">Items added will appear here...</div>
-    </div>
-
-    <!-- Steps 1-6 -->
-    <div id="clientInfoSection" class="section active">
-        <h1>Step 1: Client Info</h1>
-        <label>Client Name:</label> <input type="text" id="clientName">
-        <label>Phone Number:</label> <input type="tel" id="clientPhone">
-        <br><button onclick="navToField()">Next: Field Areas</button>
-    </div>
-
-    <div id="fieldAreaSection" class="section">
-        <h2>Step 2: Field Area</h2>
-        <label>Length (ft):</label> <input type="number" id="fieldLength">
-        <label>Width (ft):</label> <input type="number" id="fieldWidth">
-        <br>
-        <button class="back-btn" onclick="showSection('clientInfoSection')">Back</button>
-        <button onclick="addFieldArea()">Add Area</button>
-        <button onclick="navToWall()">Next Step</button>
-    </div>
-
-    <div id="wallAndCurbSection" class="section">
-        <h2>Step 3: Walls and Curbs</h2>
-        <label>Height (ft):</label> <input type="number" id="wallHeight">
-        <label>Length (ft):</label> <input type="number" id="wallLength">
-        <br>
-        <button class="back-btn" onclick="showSection('fieldAreaSection')">Back</button>
-        <button onclick="addWallAndCurbArea()">Add Wall</button>
-        <button onclick="navToDrain()">Next Step</button>
-    </div>
-
-    <div id="drainSection" class="section">
-        <h2>Step 4: Drains</h2>
-        <div class="drain-group">
-            <select id="option3"><option value="">-- 3" Option --</option><option value="Replacement">Replacement</option><option value="Retrofit">Retrofit</option></select>
-            <button onclick="addDrain('3-Inch Drain', 'option3')">Add 3"</button>
-        </div>
-        <div class="drain-group">
-            <select id="option4"><option value="">-- 4" Option --</option><option value="Replacement">Replacement</option><option value="Retrofit">Retrofit</option></select>
-            <button onclick="addDrain('4-Inch Drain', 'option4')">Add 4"</button>
-        </div>
-        <button class="back-btn" onclick="showSection('wallAndCurbSection')">Back</button>
-        <button onclick="navToHeight()">Next Step</button>
-    </div>
-
-    <div id="heightHazardSection" class="section">
-        <h2>Step 5: Height Hazard</h2>
-        <label>Stories:</label> <input type="number" id="storyHeight">
-        <br>
-        <button class="back-btn" onclick="showSection('drainSection')">Back</button>
-        <button onclick="navToGutter()">Next Step</button>
-    </div>
-
-    <div id="guttersSection" class="section">
-        <h2>Step 6: Gutters</h2>
-        <label>Gutter Length (ft):</label> <input type="number" id="gutterLength">
-        <br>
-        <button class="back-btn" onclick="showSection('heightHazardSection')">Back</button>
-        <button onclick="addGutter()">Add Gutter</button>
-        <button onclick="showFinalSummary()">Generate Summary</button>
-    </div>
-
-    <!-- Final Summary -->
-    <div id="summarySection" class="section">
-        <h2>Final Project Summary</h2>
-        <label>Select Job Type for Quote:</label>
-        <select id="quoteType" onchange="calculateQuote()">
-            <option value="0">-- Select Quote Type --</option>
-            <option value="7.50">Recover ($7.50/sq ft)</option>
-            <option value="11.50">Replacement ($11.50/sq ft)</option>
-        </select>
-        
-        <div id="finalOutput"></div>
-        <button class="clear-btn" onclick="location.reload()">Start New Quote</button>
-    </div>
-
-    <script>
-        let data = { clientName: '', clientPhone: '', fieldAreas: [], wallAndCurbAreas: [], drains: [], heightHazard: '', gutters: [], currentEstimate: 0 };
-
-        function showSection(id) {
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
-
-        function navToField() { data.clientName = document.getElementById('clientName').value; data.clientPhone = document.getElementById('clientPhone').value; updateDisplay(); showSection('fieldAreaSection'); }
-        function navToWall() { addFieldArea(); showSection('wallAndCurbSection'); }
-        function navToDrain() { addWallAndCurbArea(); showSection('drainSection'); }
-        function navToHeight() { updateDisplay(); showSection('heightHazardSection'); }
-        function navToGutter() { data.heightHazard = document.getElementById('storyHeight').value; updateDisplay(); showSection('guttersSection'); }
-
-        function addFieldArea() {
-            const l = parseFloat(document.getElementById('fieldLength').value), w = parseFloat(document.getElementById('fieldWidth').value);
-            if (!isNaN(l) && !isNaN(w)) { data.fieldAreas.push({ length: l, width: w }); document.getElementById('fieldLength').value = ''; document.getElementById('fieldWidth').value = ''; updateDisplay(); }
-        }
-        function addWallAndCurbArea() {
-            const h = parseFloat(document.getElementById('wallHeight').value), l = parseFloat(document.getElementById('wallLength').value);
-            if (!isNaN(h) && !isNaN(l)) { data.wallAndCurbAreas.push({ height: h, length: l }); document.getElementById('wallHeight').value = ''; document.getElementById('wallLength').value = ''; updateDisplay(); }
-        }
-        function addDrain(type, selId) {
-            const opt = document.getElementById(selId).value;
-            if (opt) { data.drains.push({ type, option: opt }); document.getElementById(selId).value = ''; updateDisplay(); }
-        }
-        function addGutter() {
-            const gl = parseFloat(document.getElementById('gutterLength').value);
-            if (!isNaN(gl)) { data.gutters.push(gl); document.getElementById('gutterLength').value = ''; updateDisplay(); }
-        }
-
-        function calculateTotals() {
-            let net = 0;
-            data.fieldAreas.forEach(a => net += (a.length * a.width));
-            data.wallAndCurbAreas.forEach(a => net += (a.height * a.length));
-            let baseSheets = (data.fieldAreas.reduce((sum, a) => sum + (a.length * a.width), 0)) / 33.33;
-            let insulation = Math.ceil(baseSheets + (baseSheets / 10));
-            return { net, waste: Math.ceil(net * 1.1), insulation };
-        }
-
-        function calculateQuote() {
-            const rate = parseFloat(document.getElementById('quoteType').value);
-            const totals = calculateTotals();
-            data.currentEstimate = totals.net * rate;
-            updateDisplay();
-            showFinalSummary(); // Refresh summary list
-        }
-
-        function updateDisplay() {
-            document.getElementById('clientDetails').innerHTML = `<strong>Client:</strong> ${data.clientName || '---'} | ${data.clientPhone || '---'}`;
-            const totals = calculateTotals();
-            document.getElementById('totalDetails').innerHTML = `<strong>Net Area:</strong> ${totals.net.toLocaleString()} sq ft | <span class="waste-text">w/ Waste: ${totals.waste.toLocaleString()}</span>`;
-            document.getElementById('quoteDisplay').innerHTML = `<strong>Project Estimate:</strong> $${data.currentEstimate.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-            
-            let listItems = [];
-            data.fieldAreas.forEach((a, i) => listItems.push(`Field ${i+1}`));
-            data.wallAndCurbAreas.forEach((a, i) => listItems.push(`Wall ${i+1}`));
-            data.drains.forEach(d => listItems.push(`${d.type}`));
-            document.getElementById('runningList').innerText = listItems.length > 0 ? listItems.join(' | ') : "Items added will appear here...";
-        }
-
-        function showFinalSummary() {
-            addGutter();
-            const totals = calculateTotals();
-            let html = `<ul class="summary-list">`;
-            if (data.currentEstimate > 0) html += `<li class="price-text">Estimated Total: $${data.currentEstimate.toLocaleString(undefined, {minimumFractionDigits: 2})}</li>`;
-            html += `<li><strong>Net Area:</strong> ${totals.net.toLocaleString()} sq ft</li>`;
-            html += `<li><strong>Insulation:</strong> ${totals.insulation} Sheets</li>`;
-            data.fieldAreas.forEach((a, i) => html += `<li>Field ${i+1}: ${a.length * a.width} sq ft</li>`);
-            data.wallAndCurbAreas.forEach((a, i) => html += `<li>Wall ${i+1}: ${a.height * a.length} sq ft</li>`);
-            data.drains.forEach(d => html += `<li>Drain: ${d.type} (${d.option})</li>`);
-            html += `<li><strong>Height:</strong> ${data.heightHazard} Stories</li>`;
-            data.gutters.forEach(g => html += `<li>Gutter: ${g} ft</li>`);
-            html += `</ul>`;
-            document.getElementById('finalOutput').innerHTML = html;
-            showSection('summarySection');
-        }
-    </script>
-</body>
-</html>
+// Example usage
+let quote = calculateQuote(50, 3, 'replacement', 20);
+console.log(quote); // Returns total cost and itemized breakdown
