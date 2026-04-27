@@ -1,34 +1,12 @@
-function calculateQuote(wasteArea, stories, drainType, totalFeet) {
-    let baseMaterialCost = wasteArea * 100; // Assuming $100 per waste area
-    let heightHazard = (stories - 1) * 1000; // $1,000 per story over 1
-    let drainCost;
-
-    switch (drainType) {
-        case 'retrofit':
-            drainCost = 750; // $750 per drain retrofit
-            break;
-        case 'replacement':
-            drainCost = 1500; // $1,500 per drain replacement
-            break;
-        default:
-            drainCost = 0; // No cost for other types
-    }
-
-    let gutterCost = totalFeet * 10; // $10 per foot of gutter
-
-    let totalCost = baseMaterialCost + heightHazard + drainCost + gutterCost;
-
-    return {
-        totalCost: totalCost,
-        itemizedBreakdown: {
-            baseMaterialCost: baseMaterialCost,
-            heightHazard: heightHazard,
-            drainCost: drainCost,
-            gutterCost: gutterCost
-        }
-    };
-}
-
-// Example usage
-let quote = calculateQuote(50, 3, 'replacement', 20);
-console.log(quote); // Returns total cost and itemized breakdown
+const deckType = document.getElementById('deckType').value;
+            let deckCost = 0;
+            let numPanels = 0;
+            if (deckType !== 'none') {
+                const panelArea = (21 / 12) * 3; // 1.75 * 3 = 5.25 sq ft
+                numPanels = Math.ceil(totals.net / panelArea);
+                if (deckType === 'a-deck') {
+                    deckCost = numPanels * 485;
+                } else if (deckType === 'b-deck') {
+                    deckCost = numPanels * 350;
+                }
+            }
