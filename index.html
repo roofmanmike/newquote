@@ -1,12 +1,361 @@
-const deckType = document.getElementById('deckType').value;
-            let deckCost = 0;
-            let numPanels = 0;
-            if (deckType !== 'none') {
-                const panelArea = (21 / 12) * 3; // 1.75 * 3 = 5.25 sq ft
-                numPanels = Math.ceil(totals.net / panelArea);
-                if (deckType === 'a-deck') {
-                    deckCost = numPanels * 485;
-                } else if (deckType === 'b-deck') {
-                    deckCost = numPanels * 350;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roofing Quote Calculator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        #headerDisplay {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background-color: #1e1e1e;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border: 2px solid #bb86fc;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            line-height: 1.6;
+        }
+        .section {
+            display: none;
+            background-color: #1e1e1e;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        .section.active { display: block; }
+        label { display: block; margin-top: 15px; font-weight: bold; color: #bb86fc; }
+        input, select {
+            width: 100%; max-width: 400px; padding: 12px; margin-top: 8px;
+            background-color: #2c2c2c; border: 1px solid #444; border-radius: 4px;
+            color: white; box-sizing: border-box;
+        }
+        button {
+            margin-top: 20px; padding: 12px 24px; margin-right: 10px;
+            background-color: #03dac6; color: #000; font-weight: bold;
+            border: none; border-radius: 4px; cursor: pointer; transition: 0.3s;
+        }
+        button:hover { background-color: #018786; }
+        .back-btn { background-color: #555; color: white; }
+        .clear-btn { background-color: #cf6679; color: #000; }
+        .drain-group { border: 1px solid #444; padding: 15px; border-radius: 8px; margin-bottom: 15px; background-color: #252525; }
+        .summary-list { list-style: none; padding: 0; }
+        .summary-list li { padding: 8px 0; border-bottom: 1px solid #333; }
+        h1 { color: #bb86fc; margin-top: 0; }
+        h2 { color: #03dac6; }
+        strong { color: #ffffff; }
+        .total-box { font-size: 1.1em; color: #03dac6; border-bottom: 1px solid #444; margin-bottom: 10px; padding-bottom: 5px; }
+        .waste-text { color: #ffab40; font-weight: bold; }
+        .price-text { color: #03dac6; font-size: 1.3em; font-weight: bold; }
+        .cost-breakdown { background-color: #252525; padding: 15px; margin: 10px 0; border-radius: 4px; border-left: 3px solid #03dac6; }
+        
+        @media (max-width: 768px) {
+            body {
+                margin: 10px;
+            }
+            #headerDisplay {
+                padding: 10px;
+                margin-bottom: 15px;
+            }
+            #clientDetails, #totalDetails, #quoteDisplay {
+                font-size: 0.9em;
+                line-height: 1.4;
+            }
+            .section {
+                padding: 15px;
+                margin: 15px 0;
+            }
+            h1 { font-size: 1.5em; }
+            h2 { font-size: 1.2em; }
+            label { margin-top: 12px; font-size: 0.95em; }
+            input, select {
+                max-width: 100%;
+                padding: 10px;
+                font-size: 16px;
+            }
+            button {
+                width: 100%;
+                margin-top: 12px;
+                margin-right: 0;
+                padding: 12px 16px;
+                font-size: 0.95em;
+            }
+            .drain-group {
+                padding: 12px;
+                margin-bottom: 12px;
+            }
+            .drain-group button {
+                margin-top: 8px;
+            }
+            .summary-list li {
+                padding: 6px 0;
+                font-size: 0.95em;
+            }
+            .total-box {
+                font-size: 0.9em;
+            }
+            .price-text {
+                font-size: 1.1em;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="headerDisplay">
+        <div id="clientDetails"><strong>Client:</strong> ---</div>
+        <div id="totalDetails" class="total-box"><strong>Net Area:</strong> 0 sq ft</div>
+        <div id="quoteDisplay" class="total-box" style="color:#bb86fc;"><strong>Project Estimate:</strong> Select job type</div>
+        <div id="runningList" style="font-size: 0.8em; opacity: 0.7; margin-top: 10px;">Items added will appear here...</div>
+    </div>
+
+    <!-- Steps 1-6 -->
+    <div id="clientInfoSection" class="section active">
+        <h1>Step 1: Client Info</h1>
+        <label>Client Name:</label> <input type="text" id="clientName">
+        <label>Phone Number:</label> <input type="tel" id="clientPhone">
+        <br><button onclick="navToField()">Next: Field Areas</button>
+    </div>
+
+    <div id="fieldAreaSection" class="section">
+        <h2>Step 2: Field Area</h2>
+        <label>Length (ft):</label> <input type="number" id="fieldLength">
+        <label>Width (ft):</label> <input type="number" id="fieldWidth">
+        <br>
+        <button class="back-btn" onclick="showSection('clientInfoSection')">Back</button>
+        <button onclick="addFieldArea()">Add Area</button>
+        <button onclick="navToWall()">Next Step</button>
+    </div>
+
+    <div id="wallAndCurbSection" class="section">
+        <h2>Step 3: Walls and Curbs</h2>
+        <label>Height (ft):</label> <input type="number" id="wallHeight">
+        <label>Length (ft):</label> <input type="number" id="wallLength">
+        <br>
+        <button class="back-btn" onclick="showSection('fieldAreaSection')">Back</button>
+        <button onclick="addWallAndCurbArea()">Add Wall</button>
+        <button onclick="navToDrain()">Next Step</button>
+    </div>
+
+    <div id="drainSection" class="section">
+        <h2>Step 4: Drains</h2>
+        <div class="drain-group">
+            <select id="option3"><option value="">-- 3" Option --</option><option value="Replacement">Replacement</option><option value="Retrofit">Retrofit</option></select>
+            <button onclick="addDrain('3-Inch Drain', 'option3')">Add 3"</button>
+        </div>
+        <div class="drain-group">
+            <select id="option4"><option value="">-- 4" Option --</option><option value="Replacement">Replacement</option><option value="Retrofit">Retrofit</option></select>
+            <button onclick="addDrain('4-Inch Drain', 'option4')">Add 4"</button>
+        </div>
+        <button class="back-btn" onclick="showSection('wallAndCurbSection')">Back</button>
+        <button onclick="navToHeight()">Next Step</button>
+    </div>
+
+    <div id="heightHazardSection" class="section">
+        <h2>Step 5: Height Hazard</h2>
+        <label>Stories:</label> <input type="number" id="storyHeight">
+        <br>
+        <button class="back-btn" onclick="showSection('drainSection')">Back</button>
+        <button onclick="navToGutter()">Next Step</button>
+    </div>
+
+    <div id="guttersSection" class="section">
+        <h2>Step 6: Gutters</h2>
+        <label>Gutter Length (ft):</label> <input type="number" id="gutterLength">
+        <br>
+        <button class="back-btn" onclick="showSection('heightHazardSection')">Back</button>
+        <button onclick="addGutter()">Add Gutter</button>
+        <button onclick="showFinalSummary()">Generate Summary</button>
+    </div>
+
+    <!-- Final Summary -->
+    <div id="summarySection" class="section">
+        <h2>Final Project Summary</h2>
+        <label>Select Job Type for Quote:</label>
+        <select id="quoteType" onchange="calculateQuote()">
+            <option value="0">-- Select Quote Type --</option>
+            <option value="7.50">Recover</option>
+            <option value="11.50">Replacement</option>
+        </select>
+        
+        <div id="finalOutput"></div>
+        <button class="clear-btn" onclick="location.reload()">Start New Quote</button>
+    </div>
+
+    <script>
+        let data = { clientName: '', clientPhone: '', fieldAreas: [], wallAndCurbAreas: [], drains: [], heightHazard: 0, gutters: [], currentEstimate: 0 };
+
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function navToField() { data.clientName = document.getElementById('clientName').value; data.clientPhone = document.getElementById('clientPhone').value; updateDisplay(); showSection('fieldAreaSection'); }
+        function navToWall() { addFieldArea(); showSection('wallAndCurbSection'); }
+        function navToDrain() { addWallAndCurbArea(); showSection('drainSection'); }
+        function navToHeight() { updateDisplay(); showSection('heightHazardSection'); }
+        function navToGutter() { data.heightHazard = parseFloat(document.getElementById('storyHeight').value) || 0; updateDisplay(); showSection('guttersSection'); }
+
+        function addFieldArea() {
+            const l = parseFloat(document.getElementById('fieldLength').value), w = parseFloat(document.getElementById('fieldWidth').value);
+            if (!isNaN(l) && !isNaN(w)) { data.fieldAreas.push({ length: l, width: w }); document.getElementById('fieldLength').value = ''; document.getElementById('fieldWidth').value = ''; updateDisplay(); }
+        }
+        function addWallAndCurbArea() {
+            const h = parseFloat(document.getElementById('wallHeight').value), l = parseFloat(document.getElementById('wallLength').value);
+            if (!isNaN(h) && !isNaN(l)) { data.wallAndCurbAreas.push({ height: h, length: l }); document.getElementById('wallHeight').value = ''; document.getElementById('wallLength').value = ''; updateDisplay(); }
+        }
+        function addDrain(type, selId) {
+            const opt = document.getElementById(selId).value;
+            if (opt) { data.drains.push({ type, option: opt }); document.getElementById(selId).value = ''; updateDisplay(); }
+        }
+        function addGutter() {
+            const gl = parseFloat(document.getElementById('gutterLength').value);
+            if (!isNaN(gl)) { data.gutters.push(gl); document.getElementById('gutterLength').value = ''; updateDisplay(); }
+        }
+
+        function calculateTotals() {
+            let net = 0;
+            data.fieldAreas.forEach(a => net += (a.length * a.width));
+            let wallNet = 0;
+            data.wallAndCurbAreas.forEach(a => wallNet += (a.height * a.length));
+            let baseSheets = (data.fieldAreas.reduce((sum, a) => sum + (a.length * a.width), 0)) / 33.33;
+            let insulation = Math.ceil(baseSheets + (baseSheets / 10));
+            const waste = Math.ceil(net * 1.1);
+            const wallWaste = Math.ceil(wallNet * 1.1);
+            const totalWithWaste = waste + wallWaste;
+            const neededSqFt = Math.ceil(totalWithWaste / 500) * 500;
+            const membraneRolls10 = Math.floor(neededSqFt / 1000);
+            const membraneRolls5 = Math.ceil((neededSqFt % 1000) / 500);
+            const membraneCost = membraneRolls10 * 1300 + membraneRolls5 * 750;
+            const insulationCost = insulation * 25;
+            const screwCost = (insulation * 10) * 2;
+            const plateCost = (insulation * 10) * 0.5;
+            return { net, waste, insulation, wallNet, wallWaste, totalWithWaste, membraneRolls10, membraneRolls5, membraneCost, insulationCost, screwCost, plateCost };
+        }
+
+        function calculateQuote() {
+            const rate = parseFloat(document.getElementById('quoteType').value);
+            if (rate === 0) return;
+            
+            const totals = calculateTotals();
+            const originalScrewCost = (totals.insulation * 10) * 2;
+            const originalPlateCost = (totals.insulation * 10) * 0.5;
+            if (rate === 11.50) {
+                totals.insulation *= 2;
+                totals.insulationCost = totals.insulation * 25;
+                totals.screwCost = originalScrewCost * 1.25;
+                totals.plateCost = originalPlateCost;
+            }
+            const materialCost = totals.waste * rate;
+            
+            // Height hazard: $1000 per story over 1
+            const heightCost = Math.max(0, (data.heightHazard - 1)) * 1000;
+            
+            // Drain costs
+            let drainCost = 0;
+            data.drains.forEach(d => {
+                if (d.option === 'Retrofit') drainCost += 450;
+                if (d.option === 'Replacement') drainCost += 180;
+            });
+            
+            // Gutter costs
+            const gutterCost = data.gutters.reduce((sum, g) => sum + g, 0) * 7.5;
+            
+            // Total
+            const totalMaterialCost = totals.membraneCost + totals.insulationCost + totals.screwCost + totals.plateCost + drainCost + gutterCost;
+            const multiplier = rate === 11.50 ? 3 : 2;
+            data.currentEstimate = totalMaterialCost * multiplier + heightCost;
+            
+            // Store for display
+            data.costBreakdown = { totalMaterialCost, heightCost, drainCost, gutterCost };
+            
+            updateDisplay();
+            showFinalSummary();
+        }
+
+        function updateDisplay() {
+            document.getElementById('clientDetails').innerHTML = `<strong>Client:</strong> ${data.clientName || '---'} | ${data.clientPhone || '---'}`;
+            const totals = calculateTotals();
+            document.getElementById('totalDetails').innerHTML = `<strong>Net Area:</strong> ${totals.net.toLocaleString()} sq ft | <span class="waste-text">w/ Waste: ${totals.waste.toLocaleString()}</span>`;
+            const rate = document.getElementById('quoteType').value;
+            if (rate !== '0') {
+                const materialCost = data.costBreakdown ? data.costBreakdown.totalMaterialCost : 0;
+                const clientCost = data.currentEstimate;
+                document.getElementById('quoteDisplay').innerHTML = `<strong>Material Cost:</strong> $${materialCost.toLocaleString(undefined, {minimumFractionDigits: 2})} | <strong>Client Cost:</strong> $${clientCost.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            } else {
+                document.getElementById('quoteDisplay').innerHTML = `<strong>Project Estimate:</strong> Select job type`;
+            }
+            
+            let listItems = [];
+            data.fieldAreas.forEach((a, i) => listItems.push(`Field ${i+1}`));
+            data.wallAndCurbAreas.forEach((a, i) => listItems.push(`Wall ${i+1}`));
+            data.drains.forEach(d => listItems.push(`${d.type}`));
+            document.getElementById('runningList').innerText = listItems.length > 0 ? listItems.join(' | ') : "Items added will appear here...";
+        }
+
+        function showFinalSummary() {
+            const rate = document.getElementById('quoteType').value;
+            if (rate === '0') {
+                showSection('summarySection');
+                return;
+            }
+            addGutter();
+            const totals = calculateTotals();
+            const originalInsulation = totals.insulation;
+            if (rate === '11.50') {
+                totals.insulation *= 2;
+            }
+            let html = `<ul class="summary-list">`;
+            
+            if (data.currentEstimate > 0) {
+                const materialCostTotal = data.costBreakdown.totalMaterialCost;
+                const clientCost = materialCostTotal * 3;
+                html += `<li class="price-text">Material Cost: $${materialCostTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</li>`;
+                html += `<li class="price-text">Client Cost: $${clientCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</li>`;
+                
+                if (data.costBreakdown) {
+                    html += `<div class="cost-breakdown">`;
+                    html += `<li><strong>Total Material Cost:</strong> $${data.costBreakdown.totalMaterialCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</li>`;
+                    if (data.costBreakdown.heightCost > 0) html += `<li><strong>Height Hazard:</strong> $${data.costBreakdown.heightCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</li>`;
+                    html += `</div>`;
                 }
             }
+            
+            let rollText = '';
+            if (totals.membraneRolls10 > 0) rollText += `${totals.membraneRolls10} x 10x100`;
+            if (totals.membraneRolls5 > 0) {
+                if (rollText) rollText += ', ';
+                rollText += `${totals.membraneRolls5} x 5x100`;
+            }
+            html += `<li><strong>Membrane Rolls:</strong> ${rollText}</li>`;
+            html += `<li><strong>Net Area:</strong> ${totals.net.toLocaleString()} sq ft</li>`;
+            html += `<li><strong>Waste Area (10%):</strong> ${totals.waste.toLocaleString()} sq ft</li>`;
+            html += `<li><strong>Insulation:</strong> ${totals.insulation} Sheets</li>`;
+            const screws = originalInsulation * 10;
+            const plates = originalInsulation * 10;
+            html += `<li><strong>Screws:</strong> ${screws}</li>`;
+            html += `<li><strong>Plates:</strong> ${plates}</li>`;
+            data.fieldAreas.forEach((a, i) => html += `<li>Field ${i+1}: ${a.length * a.width} sq ft</li>`);
+            data.wallAndCurbAreas.forEach((a, i) => html += `<li>Wall ${i+1}: ${a.height * a.length} sq ft</li>`);
+            data.drains.forEach(d => html += `<li>Drain: ${d.type} (${d.option})</li>`);
+            html += `<li><strong>Height:</strong> ${data.heightHazard} Stories</li>`;
+            if (data.gutters.length > 0) {
+                const gutterList = data.gutters.join(' ft, ') + ' ft';
+                html += `<li>Gutters: ${gutterList}</li>`;
+            }
+            html += `</ul>`;
+            
+            document.getElementById('finalOutput').innerHTML = html;
+            showSection('summarySection');
+        }
+    </script>
+</body>
+</html>
