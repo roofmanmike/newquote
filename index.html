@@ -287,14 +287,20 @@
             return { net, waste, insulation, wallNet, wallWaste, totalWithWaste, neededSqFt, membraneRolls10, membraneRolls5, membraneCost, insulationCost, screwCost, plateCost };
         }
 
-        function calculateAdhesiveCosts(totalWithWaste) {
+        function calculateAdhesiveCosts(totalWithWaste, includeOnlyBonding = false) {
             // Bonding adhesive: covers 500 sq ft per 5 gallon bucket, costs $240
             const bondingBuckets = Math.ceil(totalWithWaste / 500);
             const bondingCost = bondingBuckets * 240;
             
-            // Low rise adhesive: covers 1700 sq ft per $500 unit (set of 2 tanks)
-            const lowRiseSets = Math.ceil(totalWithWaste / 1700);
-            const lowRiseCost = lowRiseSets * 500;
+            let lowRiseSets = 0;
+            let lowRiseCost = 0;
+            
+            // Only calculate low rise if not using bonding-only mode
+            if (!includeOnlyBonding) {
+                // Low rise adhesive: covers 1700 sq ft per $500 unit (set of 2 tanks)
+                lowRiseSets = Math.ceil(totalWithWaste / 1700);
+                lowRiseCost = lowRiseSets * 500;
+            }
             
             return { bondingBuckets, bondingCost, lowRiseSets, lowRiseCost, totalAdhesiveCost: bondingCost + lowRiseCost };
         }
@@ -328,23 +334,29 @@
             // Gutter costs
             const gutterCost = data.gutters.reduce((sum, g) => sum + g, 0) * 7.5;
             
-            // Calculate costs based on system type
+            // Calculate costs based on system type and quote type
             let totalMaterialCost = 0;
             let adhesiveCosts = null;
             
             if (data.systemType === 'mechanically-fastened') {
                 totalMaterialCost = totals.membraneCost + totals.insulationCost + totals.screwCost + totals.plateCost + drainCost + gutterCost;
             } else if (data.systemType === 'fully-adhered') {
-                adhesiveCosts = calculateAdhesiveCosts(totals.totalWithWaste);
-                // Replace screws and plates with adhesives
-                totalMaterialCost = totals.membraneCost + totals.insulationCost + adhesiveCosts.totalAdhesiveCost + drainCost + gutterCost;
+                if (rate === 7.50) {
+                    // Recover with fully adhered: keep screws/plates and add bonding adhesive only
+                    adhesiveCosts = calculateAdhesiveCosts(totals.totalWithWaste, true); // true = bonding only
+                    totalMaterialCost = totals.membraneCost + totals.insulationCost + totals.screwCost + totals.plateCost + adhesiveCosts.totalAdhesiveCost + drainCost + gutterCost;
+                } else {
+                    // Replacement with fully adhered: use both adhesives, no screws/plates
+                    adhesiveCosts = calculateAdhesiveCosts(totals.totalWithWaste, false); // false = both adhesives
+                    totalMaterialCost = totals.membraneCost + totals.insulationCost + adhesiveCosts.totalAdhesiveCost + drainCost + gutterCost;
+                }
             }
             
             const multiplier = rate === 11.50 ? 3 : 2;
             data.currentEstimate = totalMaterialCost * multiplier + heightCost;
             
             // Store for display
-            data.costBreakdown = { totalMaterialCost, heightCost, drainCost, gutterCost, adhesiveCosts, systemType: data.systemType };
+            data.costBreakdown = { totalMaterialCost, heightCost, drainCost, gutterCost, adhesiveCosts, systemType: data.systemType, quoteType: rate };
             
             updateDisplay();
             showFinalSummary();
@@ -410,14 +422,21 @@
             html += `<li><strong>Waste Area (10%):</strong> ${totals.waste.toLocaleString()} sq ft</li>`;
             html += `<li><strong>Insulation:</strong> ${totals.insulation} Sheets</li>`;
             
-            if (data.costBreakdown.systemType === 'mechanically-fastened') {
+            // For mechanically fastened or fully adhered recover, show screws/plates
+            if (data.costBreakdown.systemType === 'mechanically-fastened' || 
+                (data.costBreakdown.systemType === 'fully-adhered' && data.costBreakdown.quoteType === 7.50)) {
                 const screws = originalInsulation * 10;
                 const plates = originalInsulation * 10;
                 html += `<li><strong>Screws:</strong> ${screws}</li>`;
                 html += `<li><strong>Plates:</strong> ${plates}</li>`;
-            } else if (data.costBreakdown.systemType === 'fully-adhered' && data.costBreakdown.adhesiveCosts) {
+            }
+            
+            // Show adhesives if present
+            if (data.costBreakdown.adhesiveCosts) {
                 html += `<li><strong>Bonding Adhesive:</strong> ${data.costBreakdown.adhesiveCosts.bondingBuckets} x 5-gal buckets @ $240 ea = $${data.costBreakdown.adhesiveCosts.bondingCost}</li>`;
-                html += `<li><strong>Low Rise Adhesive:</strong> ${data.costBreakdown.adhesiveCosts.lowRiseSets} x sets (2 tanks) @ $500 ea = $${data.costBreakdown.adhesiveCosts.lowRiseCost}</li>`;
+                if (data.costBreakdown.adhesiveCosts.lowRiseSets > 0) {
+                    html += `<li><strong>Low Rise Adhesive:</strong> ${data.costBreakdown.adhesiveCosts.lowRiseSets} x sets (2 tanks) @ $500 ea = $${data.costBreakdown.adhesiveCosts.lowRiseCost}</li>`;
+                }
             }
             
             data.fieldAreas.forEach((a, i) => html += `<li>Field ${i+1}: ${a.length * a.width} sq ft</li>`);
