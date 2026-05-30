@@ -56,6 +56,23 @@
         .waste-text { color: #ffab40; font-weight: bold; }
         .price-text { color: #03dac6; font-size: 1.3em; font-weight: bold; }
         .cost-breakdown { background-color: #252525; padding: 15px; margin: 10px 0; border-radius: 4px; border-left: 3px solid #03dac6; }
+        .system-choice { display: flex; gap: 15px; margin-top: 15px; flex-wrap: wrap; }
+        .system-btn { 
+            padding: 12px 20px; 
+            border: 2px solid #444; 
+            background-color: #2c2c2c; 
+            color: #e0e0e0; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            transition: 0.3s;
+            font-weight: bold;
+        }
+        .system-btn:hover { border-color: #03dac6; }
+        .system-btn.active { 
+            background-color: #03dac6; 
+            color: #000; 
+            border-color: #03dac6; 
+        }
         
         @media (max-width: 768px) {
             body {
@@ -104,6 +121,12 @@
             }
             .price-text {
                 font-size: 1.1em;
+            }
+            .system-choice {
+                flex-direction: column;
+            }
+            .system-btn {
+                width: 100%;
             }
         }
     </style>
@@ -185,17 +208,40 @@
             <option value="7.50">Recover</option>
             <option value="11.50">Replacement</option>
         </select>
+
+        <label style="margin-top: 25px;">Select Installation System:</label>
+        <div class="system-choice">
+            <button class="system-btn" onclick="selectSystem('mechanically-fastened')">Mechanically Fastened</button>
+            <button class="system-btn" onclick="selectSystem('fully-adhered')">Fully Adhered</button>
+        </div>
         
         <div id="finalOutput"></div>
         <button class="clear-btn" onclick="location.reload()">Start New Quote</button>
     </div>
 
     <script>
-        let data = { clientName: '', clientPhone: '', fieldAreas: [], wallAndCurbAreas: [], drains: [], heightHazard: 0, gutters: [], currentEstimate: 0 };
+        let data = { 
+            clientName: '', 
+            clientPhone: '', 
+            fieldAreas: [], 
+            wallAndCurbAreas: [], 
+            drains: [], 
+            heightHazard: 0, 
+            gutters: [], 
+            currentEstimate: 0,
+            systemType: null
+        };
 
         function showSection(id) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
+        }
+
+        function selectSystem(system) {
+            data.systemType = system;
+            document.querySelectorAll('.system-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            calculateQuote();
         }
 
         function navToField() { data.clientName = document.getElementById('clientName').value; data.clientPhone = document.getElementById('clientPhone').value; updateDisplay(); showSection('fieldAreaSection'); }
@@ -238,16 +284,29 @@
             const insulationCost = insulation * 25;
             const screwCost = (insulation * 10) * 2;
             const plateCost = (insulation * 10) * 0.5;
-            return { net, waste, insulation, wallNet, wallWaste, totalWithWaste, membraneRolls10, membraneRolls5, membraneCost, insulationCost, screwCost, plateCost };
+            return { net, waste, insulation, wallNet, wallWaste, totalWithWaste, neededSqFt, membraneRolls10, membraneRolls5, membraneCost, insulationCost, screwCost, plateCost };
+        }
+
+        function calculateAdhesiveCosts(totalWithWaste) {
+            // Bonding adhesive: covers 500 sq ft per 5 gallon bucket, costs $240
+            const bondingBuckets = Math.ceil(totalWithWaste / 500);
+            const bondingCost = bondingBuckets * 240;
+            
+            // Low rise adhesive: covers 1700 sq ft per $500 unit (set of 2 tanks)
+            const lowRiseSets = Math.ceil(totalWithWaste / 1700);
+            const lowRiseCost = lowRiseSets * 500;
+            
+            return { bondingBuckets, bondingCost, lowRiseSets, lowRiseCost, totalAdhesiveCost: bondingCost + lowRiseCost };
         }
 
         function calculateQuote() {
             const rate = parseFloat(document.getElementById('quoteType').value);
-            if (rate === 0) return;
+            if (rate === 0 || !data.systemType) return;
             
             const totals = calculateTotals();
             const originalScrewCost = (totals.insulation * 10) * 2;
             const originalPlateCost = (totals.insulation * 10) * 0.5;
+            
             if (rate === 11.50) {
                 totals.insulation *= 2;
                 totals.insulationCost = totals.insulation * 25;
@@ -269,13 +328,23 @@
             // Gutter costs
             const gutterCost = data.gutters.reduce((sum, g) => sum + g, 0) * 7.5;
             
-            // Total
-            const totalMaterialCost = totals.membraneCost + totals.insulationCost + totals.screwCost + totals.plateCost + drainCost + gutterCost;
+            // Calculate costs based on system type
+            let totalMaterialCost = 0;
+            let adhesiveCosts = null;
+            
+            if (data.systemType === 'mechanically-fastened') {
+                totalMaterialCost = totals.membraneCost + totals.insulationCost + totals.screwCost + totals.plateCost + drainCost + gutterCost;
+            } else if (data.systemType === 'fully-adhered') {
+                adhesiveCosts = calculateAdhesiveCosts(totals.totalWithWaste);
+                // Replace screws and plates with adhesives
+                totalMaterialCost = totals.membraneCost + totals.insulationCost + adhesiveCosts.totalAdhesiveCost + drainCost + gutterCost;
+            }
+            
             const multiplier = rate === 11.50 ? 3 : 2;
             data.currentEstimate = totalMaterialCost * multiplier + heightCost;
             
             // Store for display
-            data.costBreakdown = { totalMaterialCost, heightCost, drainCost, gutterCost };
+            data.costBreakdown = { totalMaterialCost, heightCost, drainCost, gutterCost, adhesiveCosts, systemType: data.systemType };
             
             updateDisplay();
             showFinalSummary();
@@ -286,12 +355,12 @@
             const totals = calculateTotals();
             document.getElementById('totalDetails').innerHTML = `<strong>Net Area:</strong> ${totals.net.toLocaleString()} sq ft | <span class="waste-text">w/ Waste: ${totals.waste.toLocaleString()}</span>`;
             const rate = document.getElementById('quoteType').value;
-            if (rate !== '0') {
+            if (rate !== '0' && data.systemType) {
                 const materialCost = data.costBreakdown ? data.costBreakdown.totalMaterialCost : 0;
                 const clientCost = data.currentEstimate;
                 document.getElementById('quoteDisplay').innerHTML = `<strong>Material Cost:</strong> $${materialCost.toLocaleString(undefined, {minimumFractionDigits: 2})} | <strong>Client Cost:</strong> $${clientCost.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
             } else {
-                document.getElementById('quoteDisplay').innerHTML = `<strong>Project Estimate:</strong> Select job type`;
+                document.getElementById('quoteDisplay').innerHTML = `<strong>Project Estimate:</strong> Select job type & system`;
             }
             
             let listItems = [];
@@ -303,7 +372,7 @@
 
         function showFinalSummary() {
             const rate = document.getElementById('quoteType').value;
-            if (rate === '0') {
+            if (rate === '0' || !data.systemType) {
                 showSection('summarySection');
                 return;
             }
@@ -323,6 +392,7 @@
                 
                 if (data.costBreakdown) {
                     html += `<div class="cost-breakdown">`;
+                    html += `<li><strong>System Type:</strong> ${data.costBreakdown.systemType === 'mechanically-fastened' ? 'Mechanically Fastened' : 'Fully Adhered'}</li>`;
                     html += `<li><strong>Total Material Cost:</strong> $${data.costBreakdown.totalMaterialCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</li>`;
                     if (data.costBreakdown.heightCost > 0) html += `<li><strong>Height Hazard:</strong> $${data.costBreakdown.heightCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</li>`;
                     html += `</div>`;
@@ -339,10 +409,17 @@
             html += `<li><strong>Net Area:</strong> ${totals.net.toLocaleString()} sq ft</li>`;
             html += `<li><strong>Waste Area (10%):</strong> ${totals.waste.toLocaleString()} sq ft</li>`;
             html += `<li><strong>Insulation:</strong> ${totals.insulation} Sheets</li>`;
-            const screws = originalInsulation * 10;
-            const plates = originalInsulation * 10;
-            html += `<li><strong>Screws:</strong> ${screws}</li>`;
-            html += `<li><strong>Plates:</strong> ${plates}</li>`;
+            
+            if (data.costBreakdown.systemType === 'mechanically-fastened') {
+                const screws = originalInsulation * 10;
+                const plates = originalInsulation * 10;
+                html += `<li><strong>Screws:</strong> ${screws}</li>`;
+                html += `<li><strong>Plates:</strong> ${plates}</li>`;
+            } else if (data.costBreakdown.systemType === 'fully-adhered' && data.costBreakdown.adhesiveCosts) {
+                html += `<li><strong>Bonding Adhesive:</strong> ${data.costBreakdown.adhesiveCosts.bondingBuckets} x 5-gal buckets @ $240 ea = $${data.costBreakdown.adhesiveCosts.bondingCost}</li>`;
+                html += `<li><strong>Low Rise Adhesive:</strong> ${data.costBreakdown.adhesiveCosts.lowRiseSets} x sets (2 tanks) @ $500 ea = $${data.costBreakdown.adhesiveCosts.lowRiseCost}</li>`;
+            }
+            
             data.fieldAreas.forEach((a, i) => html += `<li>Field ${i+1}: ${a.length * a.width} sq ft</li>`);
             data.wallAndCurbAreas.forEach((a, i) => html += `<li>Wall ${i+1}: ${a.height * a.length} sq ft</li>`);
             data.drains.forEach(d => html += `<li>Drain: ${d.type} (${d.option})</li>`);
